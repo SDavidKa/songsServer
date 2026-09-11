@@ -23,7 +23,8 @@ import kotlin.concurrent.thread
 
 fun main() {
     cleaningCacheThread()
-    embeddedServer(Netty, port = 2403, host = "127.0.0.1", module = Application::module)
+    val serverHost = System.getenv("SERVER_HOST") ?: "127.0.0.1"
+    embeddedServer(Netty, port = 2403, host = serverHost, module = Application::module)
         .start(wait = true)
 }
 
@@ -33,8 +34,16 @@ fun Application.module() {
     configureRouting()
 }
 
-val dbConnection: Connection = DriverManager.getConnection(
-    "jdbc:postgresql://localhost:5432/songsserver", "songsserver", System.getenv("POSTGRES_PASSWORD"))
+val dbConnection: Connection = run {
+    val dbHost = System.getenv("POSTGRES_HOST") ?: "localhost"
+    val dbPort = System.getenv("POSTGRES_PORT") ?: "5432"
+    val dbName = System.getenv("POSTGRES_DB") ?: "songsserver_db"
+    val dbUser = System.getenv("POSTGRES_USER") ?: "songsserver_user"
+    val dbSchema = System.getenv("POSTGRES_SCHEMA")
+    val jdbcUrl = if (dbSchema != null) "jdbc:postgresql://$dbHost:$dbPort/$dbName?currentSchema=$dbSchema"
+        else "jdbc:postgresql://$dbHost:$dbPort/$dbName"
+    DriverManager.getConnection(jdbcUrl, dbUser, System.getenv("POSTGRES_PASSWORD"))
+}
 val dbLock = Mutex()
 
 fun cleaningCacheThread() {
