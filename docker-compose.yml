@@ -1,0 +1,18 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      SERVER_HOST: 0.0.0.0
+      CACHE_PATH: /app/cache/
+    ports:
+      - "127.0.0.1:2403:2403"
+    volumes:
+      - audio_cache:/app/cache
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  audio_cache:
