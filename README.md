@@ -47,23 +47,30 @@ Notes:
 
 ### Nginx & TLS setup
 
-Both this backend and the [frontend](https://github.com/titovtima/songsSite) run as Docker containers on the same server, published only on `127.0.0.1` (see `docker-compose.yml`). Nginx on the host terminates TLS and serves both from a **single domain**, routing by path — config in [`nginx/worship.wolrus.ru.conf`](nginx/worship.wolrus.ru.conf):
+Two separate servers are involved:
 
-* `/api/` → backend container (`127.0.0.1:2403`)
-* everything else → frontend container (`127.0.0.1:3000`)
+* **Proxy server** — public-facing, owns the DNS record for `worship.wolrus.ru`, terminates TLS. This is the only server that needs Nginx.
+* **App server** — runs this backend and the [frontend](https://github.com/titovtima/songsSite) as Docker containers, reachable from the proxy server only over its public IP (see `docker-compose.yml`, which publishes `0.0.0.0:2403:2403`, and the frontend's own compose file, which must publish its `3000` the same way).
 
-A single domain means the frontend's browser-side requests (which go to `window.location.origin`) and its API calls land on the same origin with no CORS configuration needed. Replace `worship.wolrus.ru` in the config with the real domain before enabling it.
+**App server:** no Nginx needed. Just make sure the app server's firewall (`ufw`/`iptables`/cloud security group) allows inbound `2403` and `3000` **only from the proxy server's IP** — since TLS terminates on the proxy, this hop is plain HTTP and must not be open to the internet.
 
-Set `HOST` in `.env` to that domain (`https://worship.wolrus.ru`) — it's used to build links inside emails that a user opens in the browser. On the frontend side, `API_HOST` is only read server-side (for SSR requests, which never touch the browser or Nginx) — the frontend's `docker-compose.yml` can skip Nginx entirely by joining the `songs-shared` external Docker network defined here and setting `API_HOST=http://app:2403`, reaching the backend container directly by its Compose service name instead of going out through Nginx and back in.
+**Proxy server:** Nginx serves the single public domain and routes by path — config in [`nginx/worship.wolrus.ru.conf`](nginx/worship.wolrus.ru.conf):
 
-1. Symlink the config into `sites-enabled` and reload Nginx:
+* `/api/` → backend on the app server (`APP_SERVER_IP:2403`)
+* everything else → frontend on the app server (`APP_SERVER_IP:3000`)
+
+Before enabling, replace `worship.wolrus.ru` with the real domain and the placeholder `203.0.113.10` with the app server's real public IP. A single public domain means the frontend's browser-side requests (which go to `window.location.origin`) and its API calls land on the same origin with no CORS configuration needed.
+
+Set `HOST` in the backend's `.env` (on the app server) to that domain (`https://worship.wolrus.ru`) — it's used to build links inside emails that a user opens in the browser. The frontend's `API_HOST`, read only server-side for SSR (which never touches the browser or either Nginx), can skip both Nginx hops by staying on the app server and reaching the backend directly over the `songs-shared` Docker network defined in this repo's `docker-compose.yml` — join it from the frontend's own compose file and set `API_HOST=http://app:2403`.
+
+1. On the proxy server, symlink the config into `sites-enabled` and reload Nginx:
 
    ```bash
    ln -s /path/to/songsServer/nginx/worship.wolrus.ru.conf /etc/nginx/sites-enabled/worship.wolrus.ru.conf
    nginx -t && systemctl reload nginx
    ```
 
-2. Issue a TLS certificate with Certbot (requires DNS for the domain already pointing at the server):
+2. Issue a TLS certificate with Certbot on the proxy server (requires DNS for the domain already pointing at it):
 
    ```bash
    sudo apt install certbot python3-certbot-nginx   # if not already installed
