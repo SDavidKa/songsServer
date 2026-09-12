@@ -11,8 +11,8 @@ import ru.titovtima.songsserver.plugins.ActionToken
 class Email(val recipients: List<String>, val subject: String, val contentType: String, val data: String,
             val sender: String = EmailsSender) {
     companion object {
-        val SendEmailRequestAddress = "http://127.0.0.1:2389"
-        val EmailsSender = "songs.istokspb@yandex.ru"
+        val SendEmailRequestAddress = System.getenv("EMAIL_SERVICE_URL") ?: throw error("Env EMAIL_SERVICE_URL not defined")
+        val EmailsSender = System.getenv("EMAIL_SENDER") ?: throw error("Env EMAIL_SENDER not defined")
 
         fun passwordRecoveryEmail(user: User): Email? {
             if (user.email == null) return null

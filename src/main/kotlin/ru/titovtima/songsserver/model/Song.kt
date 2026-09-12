@@ -510,9 +510,9 @@ data class SongRights(val songId: Int, val readers: List<String>, val writers: L
 
 class SongAudio {
     companion object {
-        private const val S3_BUCKET = "songsserver"
-        private val endpointUrl = Url.parse("https://hb.vkcs.cloud/")
-        private const val region = "ru-msk"
+        private val S3_BUCKET = System.getenv("S3_BUCKET") ?: throw error("Env S3_BUCKET not defined")
+        private val endpointUrl = Url.parse(System.getenv("S3_ENDPOINT_URL") ?: throw error("Env S3_ENDPOINT_URL not defined"))
+        private val region = System.getenv("S3_REGION") ?: throw error("Env S3_REGION not defined")
 
         suspend fun loadAudioFromS3(uuid: String): ByteArray? {
             val getRequest = GetObjectRequest {

@@ -9,7 +9,7 @@ import ru.titovtima.songsserver.Encoder
 import ru.titovtima.songsserver.dbConnection
 import java.util.Date
 
-val jwtSecret: String = System.getenv("JWT_SECRET")
+val jwtSecret: String = System.getenv("JWT_SECRET") ?: throw error("Env JWT_SECRET not defined")
 
 fun Application.configureSecurity() {
     val authRealm = "songs site"
