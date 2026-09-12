@@ -14,10 +14,12 @@ The server is running on `localhost:2403` and use proxy server (caddy) to establ
 Env variables that are needed for the project works properly:
 
 * `AWS_ACCESS_KEY_ID` & `AWS_SECRET_ACCESS_KEY` - key for S3 storage access
+* `S3_BUCKET`, `S3_ENDPOINT_URL`, `S3_REGION` - S3-compatible storage location for audio files
 * `CACHE_PATH` - path to cache files got from S3 storage
 * `HOST` - external host where the app instance is running. Used in emails
 * `JWT_SECRET` - secret string for jwt authorization (though main auth strategy is by bearer token)
 * `POSTGRES_PASSWORD` - database password for user `songsserver`
+* `EMAIL_SERVICE_URL`, `EMAIL_SENDER`, `EMAIL_SERVICE_TOKEN` - outgoing email service (password recovery, etc.); the service is a DRF endpoint requiring `Authorization: Token <EMAIL_SERVICE_TOKEN>`
 
 Optional, with defaults matching the original single-database setup:
 
@@ -45,28 +47,27 @@ Notes:
 
 ### Nginx & TLS setup
 
-Both this backend and the [frontend](https://github.com/titovtima/songsSite) run as Docker containers on the same server, published only on `127.0.0.1` (see `docker-compose.yml`). Nginx on the host reverse-proxies each one from its own domain and terminates TLS:
+Both this backend and the [frontend](https://github.com/titovtima/songsSite) run as Docker containers on the same server, published only on `127.0.0.1` (see `docker-compose.yml`). Nginx on the host terminates TLS and serves both from a **single domain**, routing by path — config in [`nginx/worship.wolrus.ru.conf`](nginx/worship.wolrus.ru.conf):
 
-* `api.example.com` → backend container (`127.0.0.1:2403`) — config in [`nginx/backend.conf`](nginx/backend.conf)
-* `example.com` → frontend container (`127.0.0.1:3000`) — config in [`nginx/frontend.conf`](nginx/frontend.conf)
+* `/api/` → backend container (`127.0.0.1:2403`)
+* everything else → frontend container (`127.0.0.1:3000`)
 
-Replace `example.com`/`api.example.com` in both files with the real domain before enabling them.
+A single domain means the frontend's browser-side requests (which go to `window.location.origin`) and its API calls land on the same origin with no CORS configuration needed. Replace `worship.wolrus.ru` in the config with the real domain before enabling it.
 
-Set `HOST` in `.env` to the **frontend** domain (`https://example.com`), not the API one — it's only used to build links inside emails that a user opens in the browser.
+Set `HOST` in `.env` to that domain (`https://worship.wolrus.ru`) — it's used to build links inside emails that a user opens in the browser. On the frontend side, `API_HOST` is only read server-side (for SSR requests, which never touch the browser or Nginx) — the frontend's `docker-compose.yml` can skip Nginx entirely by joining the `songs-shared` external Docker network defined here and setting `API_HOST=http://app:2403`, reaching the backend container directly by its Compose service name instead of going out through Nginx and back in.
 
-1. Symlink the configs into `sites-enabled` and reload Nginx:
+1. Symlink the config into `sites-enabled` and reload Nginx:
 
    ```bash
-   ln -s /path/to/songsServer/nginx/backend.conf /etc/nginx/sites-enabled/api.example.com.conf
-   ln -s /path/to/songsServer/nginx/frontend.conf /etc/nginx/sites-enabled/example.com.conf
+   ln -s /path/to/songsServer/nginx/worship.wolrus.ru.conf /etc/nginx/sites-enabled/worship.wolrus.ru.conf
    nginx -t && systemctl reload nginx
    ```
 
-2. Issue TLS certificates with Certbot (requires DNS for both domains already pointing at the server):
+2. Issue a TLS certificate with Certbot (requires DNS for the domain already pointing at the server):
 
    ```bash
    sudo apt install certbot python3-certbot-nginx   # if not already installed
-   sudo certbot --nginx -d example.com -d api.example.com
+   sudo certbot --nginx -d worship.wolrus.ru
    ```
 
-   Certbot edits the symlinked configs in place to add the `listen 443 ssl` block and sets up auto-renewal (`certbot renew` via a systemd timer/cron, installed automatically).
+   Certbot edits the symlinked config in place to add the `listen 443 ssl` block and sets up auto-renewal (`certbot renew` via a systemd timer/cron, installed automatically).
