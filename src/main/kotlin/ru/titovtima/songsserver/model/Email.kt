@@ -13,6 +13,7 @@ class Email(val recipients: List<String>, val subject: String, val contentType: 
     companion object {
         val SendEmailRequestAddress = System.getenv("EMAIL_SERVICE_URL") ?: throw error("Env EMAIL_SERVICE_URL not defined")
         val EmailsSender = System.getenv("EMAIL_SENDER") ?: throw error("Env EMAIL_SENDER not defined")
+        val EmailServiceToken = System.getenv("EMAIL_SERVICE_TOKEN") ?: throw error("Env EMAIL_SERVICE_TOKEN not defined")
 
         fun passwordRecoveryEmail(user: User): Email? {
             if (user.email == null) return null
@@ -27,6 +28,7 @@ class Email(val recipients: List<String>, val subject: String, val contentType: 
     suspend fun send() {
         httpClient.post(SendEmailRequestAddress) {
             contentType(ContentType.Application.Json)
+            header(HttpHeaders.Authorization, "Token $EmailServiceToken")
             setBody(this@Email)
         }
     }
