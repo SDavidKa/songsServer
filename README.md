@@ -42,3 +42,31 @@ psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_D
 Notes:
 * `PGSSLMODE=verify-full` is required by managed clusters (e.g. Yandex Cloud) that enforce SSL; it needs the provider's root CA certificate at `~/.postgresql/root.crt` (for Yandex Cloud: `curl -o ~/.postgresql/root.crt https://storage.yandexcloud.net/cloud-certs/CA.pem`). Drop it for a local/unmanaged instance that doesn't require SSL.
 * `PGOPTIONS` sets `search_path` so objects are created in `POSTGRES_SCHEMA` rather than `public`; omit it if the project uses a dedicated database instead of a shared one.
+
+### Nginx & TLS setup
+
+Both this backend and the [frontend](https://github.com/titovtima/songsSite) run as Docker containers on the same server, published only on `127.0.0.1` (see `docker-compose.yml`). Nginx on the host reverse-proxies each one from its own domain and terminates TLS:
+
+* `api.example.com` → backend container (`127.0.0.1:2403`) — config in [`nginx/backend.conf`](nginx/backend.conf)
+* `example.com` → frontend container (`127.0.0.1:3000`) — config in [`nginx/frontend.conf`](nginx/frontend.conf)
+
+Replace `example.com`/`api.example.com` in both files with the real domain before enabling them.
+
+Set `HOST` in `.env` to the **frontend** domain (`https://example.com`), not the API one — it's only used to build links inside emails that a user opens in the browser.
+
+1. Symlink the configs into `sites-enabled` and reload Nginx:
+
+   ```bash
+   ln -s /path/to/songsServer/nginx/backend.conf /etc/nginx/sites-enabled/api.example.com.conf
+   ln -s /path/to/songsServer/nginx/frontend.conf /etc/nginx/sites-enabled/example.com.conf
+   nginx -t && systemctl reload nginx
+   ```
+
+2. Issue TLS certificates with Certbot (requires DNS for both domains already pointing at the server):
+
+   ```bash
+   sudo apt install certbot python3-certbot-nginx   # if not already installed
+   sudo certbot --nginx -d example.com -d api.example.com
+   ```
+
+   Certbot edits the symlinked configs in place to add the `listen 443 ssl` block and sets up auto-renewal (`certbot renew` via a systemd timer/cron, installed automatically).
