@@ -13,6 +13,12 @@ services:
       - audio_cache:/app/cache
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    networks:
+      - shared
 
 volumes:
   audio_cache:
+
+networks:
+  shared:
+    name: songs-shared
