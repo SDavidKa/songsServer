@@ -377,8 +377,9 @@ data class SongPerformance(var id: Int, val artists: List<Artist>, val songName:
         else query.setInt(11, bpm)
         query.setBoolean(12, isOriginal)
         query.setBoolean(13, isMain)
-        if (audio == null) query.setNull(14, Types.VARCHAR)
-        else query.setString(14, audio)
+        val audioValue = audio?.trim()?.takeIf { it.isNotEmpty() }
+        if (audioValue == null) query.setNull(14, Types.VARCHAR)
+        else query.setString(14, audioValue)
         query.executeUpdate()
         if (artists.isNotEmpty()) {
             val artistsString = "insert into performance_artist(performance_id, artist_id) values " +
