@@ -4,6 +4,7 @@ import kotlinx.serialization.Serializable
 import ru.titovtima.songsserver.Encoder
 import ru.titovtima.songsserver.OldEncoder
 import ru.titovtima.songsserver.dbConnection
+import ru.titovtima.songsserver.rollbackDb
 import java.sql.Types
 
 @Serializable
@@ -115,8 +116,7 @@ class Authorization {
                 return newId
             } catch (e: Exception) {
                 println(e)
-                dbConnection.rollback()
-                dbConnection.autoCommit = true
+                rollbackDb()
                 return null
             }
         }

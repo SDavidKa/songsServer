@@ -10,6 +10,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import ru.titovtima.songsserver.dbConnection
 import ru.titovtima.songsserver.dbLock
+import ru.titovtima.songsserver.rollbackDb
 import java.sql.ResultSet
 import java.sql.Types
 import java.util.Collections
@@ -130,8 +131,7 @@ data class Song (val id: Int, val name: String, val extra: String?, val key: Int
                     query.setInt(1, id)
                     for (i in allAudios.indices) query.setString(i + 2, allAudios[i])
                     if (query.executeUpdate() != allAudios.size) {
-                        dbConnection.rollback()
-                        dbConnection.autoCommit = true
+                        rollbackDb()
                         return false
                     }
                 }
@@ -148,8 +148,7 @@ data class Song (val id: Int, val name: String, val extra: String?, val key: Int
                 for (performance in performances) performance.saveToDb(id)
             } catch (e: Exception) {
                 println(e)
-                dbConnection.rollback()
-                dbConnection.autoCommit = true
+                rollbackDb()
                 return false
             }
             dbConnection.commit()
@@ -184,8 +183,7 @@ data class NewSongData (val name: String, val extra: String? = null, val key: In
             return newId
         } catch (e: Exception) {
             println(e)
-            dbConnection.rollback()
-            dbConnection.autoCommit = true
+            rollbackDb()
             return null
         }
     }
@@ -471,8 +469,7 @@ data class SongRights(val songId: Int, val readers: List<String>, val writers: L
                     queryAddReaders.setInt(i * 2 + 2, songId)
                 }
                 if (queryAddReaders.executeUpdate() != readersIds.size) {
-                    dbConnection.rollback()
-                    dbConnection.autoCommit = true
+                    rollbackDb()
                     return false
                 }
             }
@@ -489,8 +486,7 @@ data class SongRights(val songId: Int, val readers: List<String>, val writers: L
                     queryAddWriters.setInt(i * 2 + 2, songId)
                 }
                 if (queryAddWriters.executeUpdate() != writersIds.size) {
-                    dbConnection.rollback()
-                    dbConnection.autoCommit = true
+                    rollbackDb()
                     return false
                 }
             }

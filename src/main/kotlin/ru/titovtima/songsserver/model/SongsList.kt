@@ -4,6 +4,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import ru.titovtima.songsserver.dbConnection
 import ru.titovtima.songsserver.dbLock
+import ru.titovtima.songsserver.rollbackDb
 import java.sql.ResultSet
 import java.util.*
 
@@ -104,8 +105,7 @@ data class SongsList(val id: Int, val name: String, val owner: String, val publi
             }
         } catch (e: Exception) {
             println(e)
-            dbConnection.rollback()
-            dbConnection.autoCommit = true
+            rollbackDb()
             return false
         }
         dbConnection.commit()
@@ -281,8 +281,7 @@ data class SongsListRights(val listId: Int, val readers: List<String>, val write
                     queryAddReaders.setInt(i * 2 + 2, listId)
                 }
                 if (queryAddReaders.executeUpdate() != readersIds.size) {
-                    dbConnection.rollback()
-                    dbConnection.autoCommit = true
+                    rollbackDb()
                     return false
                 }
             }
@@ -299,8 +298,7 @@ data class SongsListRights(val listId: Int, val readers: List<String>, val write
                     queryAddWriters.setInt(i * 2 + 2, listId)
                 }
                 if (queryAddWriters.executeUpdate() != writersIds.size) {
-                    dbConnection.rollback()
-                    dbConnection.autoCommit = true
+                    rollbackDb()
                     return false
                 }
             }

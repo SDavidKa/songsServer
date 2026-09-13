@@ -34,7 +34,7 @@ fun Application.module() {
     configureRouting()
 }
 
-val dbConnection: Connection = run {
+private fun createDbConnection(): Connection {
     val dbHost = System.getenv("POSTGRES_HOST") ?: "localhost"
     val dbPort = System.getenv("POSTGRES_PORT") ?: "5432"
     val dbName = System.getenv("POSTGRES_DB") ?: "songsserver_db"
@@ -42,9 +42,40 @@ val dbConnection: Connection = run {
     val dbSchema = System.getenv("POSTGRES_SCHEMA")
     val jdbcUrl = if (dbSchema != null) "jdbc:postgresql://$dbHost:$dbPort/$dbName?currentSchema=$dbSchema"
         else "jdbc:postgresql://$dbHost:$dbPort/$dbName"
-    DriverManager.getConnection(jdbcUrl, dbUser, System.getenv("POSTGRES_PASSWORD"))
+    return DriverManager.getConnection(jdbcUrl, dbUser, System.getenv("POSTGRES_PASSWORD"))
 }
+
+private var _dbConnection: Connection = createDbConnection()
+private val dbConnectionReconnectLock = Object()
+
+// Reconnects transparently if the single shared connection was closed by the
+// server/network (e.g. idle timeout, DB restart) - otherwise every query would
+// keep failing with "This connection has been closed" until the app is restarted.
+val dbConnection: Connection
+    get() = synchronized(dbConnectionReconnectLock) {
+        if (_dbConnection.isClosed) {
+            _dbConnection = createDbConnection()
+        }
+        _dbConnection
+    }
+
 val dbLock = Mutex()
+
+// Rolls back the current transaction and resets autoCommit, swallowing any
+// failure from either step (e.g. the connection is already dead) so a broken
+// connection during cleanup never masks the original error or crashes the caller.
+fun rollbackDb() {
+    try {
+        dbConnection.rollback()
+    } catch (e: Exception) {
+        println("Failed to roll back transaction: $e")
+    }
+    try {
+        dbConnection.autoCommit = true
+    } catch (e: Exception) {
+        println("Failed to reset autoCommit: $e")
+    }
+}
 
 fun cleaningCacheThread() {
     thread {
